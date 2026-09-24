@@ -37,12 +37,13 @@ export async function searchImages({ keyword, count = 10, safesearch = true, api
 
   while (hits.length < target) {
     const remaining = target - hits.length;
-    const perPage = Math.min(remaining, maxPerPage);
+    // Pixabay 要求 per_page 在 3–200 之间；多来源分摊后 remaining 可能小于 3，需夹紧到下限
+    const perPage = Math.max(3, Math.min(remaining, maxPerPage));
     const url = `https://pixabay.com/api/?key=${key}&q=${encodedKeyword}&image_type=photo&per_page=${perPage}&page=${page}&safesearch=${safe}`;
 
     let response;
     try {
-      response = await fetch(url);
+      response = await fetch(url, { signal: AbortSignal.timeout(30000) });
     } catch (err) {
       throw new NetworkError(err.message || "Network request failed");
     }

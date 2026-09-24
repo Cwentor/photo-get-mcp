@@ -1,7 +1,7 @@
 {
   "name": "photo-get-mcp",
-  "version": "1.1.0",
-  "description": "MCP 图片抓取服务器：按关键词从 Pixabay / Picjumbo 搜索并下载免版权图片",
+  "version": "1.2.0",
+  "description": "MCP 图片抓取服务器：按关键词从 Pixabay / Picjumbo / Pexels / Freerange / Noun Project / Magnific 搜索并下载免版权图片",
   "main": "src/server.js",
   "type": "module",
   "engines": {
@@ -9,8 +9,8 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "test": "node --test tests/tools.test.js tests/picjumbo.test.js tests/server-handshake.test.js tests/e2e.test.js",
-    "test:fast": "node --test tests/tools.test.js tests/picjumbo.test.js tests/server-handshake.test.js"
+    "test": "node --test tests/tools.test.js tests/sources.test.js tests/picjumbo.test.js tests/freerangestock.test.js tests/live-sources.test.js tests/server-handshake.test.js tests/e2e.test.js",
+    "test:fast": "node --test tests/tools.test.js tests/sources.test.js tests/picjumbo.test.js tests/freerangestock.test.js tests/live-sources.test.js tests/server-handshake.test.js"
   },
   "keywords": [
     "mcp",
@@ -18,6 +18,10 @@
     "image-search",
     "pixabay",
     "picjumbo",
+    "pexels",
+    "freerange",
+    "noun-project",
+    "magnific",
     "stock-photos",
     "image-downloader"
   ],

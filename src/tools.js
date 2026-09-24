@@ -1,20 +1,33 @@
 import { z } from "zod";
 import { searchImages as searchPixabay, getApiKey, PixabayApiError, NetworkError } from "./pixabay.js";
 import { searchImages as searchPicjumbo } from "./picjumbo.js";
+import { searchImages as searchPexels } from "./pexels.js";
+import { searchImages as searchFreerange } from "./freerangestock.js";
+import { searchImages as searchNounProject } from "./nounproject.js";
+import { searchImages as searchMagnific } from "./magnific.js";
 import { ensureDir, concurrentDownloadBatch } from "./downloader.js";
 import path from "node:path";
 
-const VALID_SOURCES = Object.freeze(["pixabay", "picjumbo"]);
+const VALID_SOURCES = Object.freeze([
+  "pixabay",
+  "picjumbo",
+  "pexels",
+  "freerangestock",
+  "nounproject",
+  "magnific",
+]);
+// 默认来源：Pixabay（内置公开 Key）+ Freerange（免 Key）
+const DEFAULT_SOURCES = Object.freeze(["pixabay", "freerangestock"]);
 
-function normalizeSources(input) {
+export function normalizeSources(input) {
   if (input === undefined || input === null) {
-    return ["pixabay"];
+    return [...DEFAULT_SOURCES];
   }
   if (Array.isArray(input)) {
     const filtered = input
       .map((s) => String(s).toLowerCase().trim())
       .filter((s) => VALID_SOURCES.includes(s));
-    return filtered.length > 0 ? [...new Set(filtered)] : ["pixabay"];
+    return filtered.length > 0 ? [...new Set(filtered)] : [...DEFAULT_SOURCES];
   }
   const s = String(input).toLowerCase().trim();
   if (VALID_SOURCES.includes(s)) return [s];
@@ -23,9 +36,9 @@ function normalizeSources(input) {
     const parts = s.split(",")
       .map((p) => p.trim().toLowerCase())
       .filter((p) => VALID_SOURCES.includes(p));
-    return parts.length > 0 ? [...new Set(parts)] : ["pixabay"];
+    return parts.length > 0 ? [...new Set(parts)] : [...DEFAULT_SOURCES];
   }
-  return ["pixabay"];
+  return [...DEFAULT_SOURCES];
 }
 
 // Zod raw shape：MCP registerTool 需要 raw shape，测试需要完整 z.object，
@@ -39,7 +52,9 @@ export const searchAndDownloadImagesShape = {
   source: z
     .union([z.string(), z.array(z.string())])
     .optional()
-    .describe("图片来源，可选 'pixabay' 或 'picjumbo'，或数组（如 ['pixabay','picjumbo']）。默认 'pixabay'。"),
+    .describe(
+      "图片来源，可选 'pixabay'、'picjumbo'、'pexels'、'freerangestock'、'nounproject'（图标）、'magnific'，支持逗号分隔字符串或数组。默认 ['pixabay','freerangestock']。pexels/nounproject/magnific 需配置 API Key 环境变量。"
+    ),
 };
 
 export const searchAndDownloadImagesSchema = z.object(searchAndDownloadImagesShape);
@@ -51,18 +66,22 @@ export const searchAndDownloadImagesInputSchema = {
     save_dir: { type: "string", description: "图片保存目录（绝对路径或相对路径），若不存在会自动创建" },
     count: { type: "number", description: "下载图片数量，默认 10，范围 1-200", minimum: 1, maximum: 200, default: 10 },
     size: { type: "string", description: "图片尺寸，默认 webformat（640px）", enum: ["preview", "webformat", "large"] },
-    safesearch: { type: "boolean", description: "是否启用安全搜索（过滤成人内容），默认 true", default: true },
+    safesearch: { type: "boolean", description: "是否启用安全搜索（过滤成人内容），默认 true。仅对 Pixabay 生效", default: true },
     source: {
       type: "array",
-      description: "图片来源列表，支持 'pixabay' 和 'picjumbo'。默认 ['pixabay']",
-      items: { type: "string", enum: ["pixabay", "picjumbo"] },
-      default: ["pixabay"],
+      description:
+        "图片来源列表，支持 'pixabay'、'picjumbo'、'pexels'、'freerangestock'、'nounproject'（图标）、'magnific'。默认 ['pixabay','freerangestock']。pexels 需 PEXELS_API_KEY；nounproject 需 NOUN_PROJECT_API_KEY/SECRET；magnific 需 MAGNIFIC_API_KEY",
+      items: {
+        type: "string",
+        enum: ["pixabay", "picjumbo", "pexels", "freerangestock", "nounproject", "magnific"],
+      },
+      default: ["pixabay", "freerangestock"],
     },
   },
   required: ["keyword", "save_dir"],
 };
 
-async function searchFromSource(sourceName, { keyword, count, safesearch }) {
+async function searchFromSource(sourceName, { keyword, count, safesearch, size }) {
   const perSourceCount = Math.max(1, Math.ceil(count));
   if (sourceName === "pixabay") {
     try {
@@ -77,17 +96,29 @@ async function searchFromSource(sourceName, { keyword, count, safesearch }) {
     const hits = await searchPicjumbo({ keyword, count: perSourceCount });
     return hits;
   }
+  if (sourceName === "pexels") {
+    return await searchPexels({ keyword, count: perSourceCount });
+  }
+  if (sourceName === "freerangestock") {
+    return await searchFreerange({ keyword, count: perSourceCount });
+  }
+  if (sourceName === "nounproject") {
+    return await searchNounProject({ keyword, count: perSourceCount });
+  }
+  if (sourceName === "magnific") {
+    return await searchMagnific({ keyword, count: perSourceCount, size });
+  }
   return [];
 }
 
-async function searchImagesFromSources(sources, { keyword, count, safesearch }) {
+async function searchImagesFromSources(sources, { keyword, count, safesearch, size }) {
   // Distribute count across sources so the total roughly equals count.
   const perSourceCount = Math.max(1, Math.ceil(count / sources.length));
   const results = [];
   const errors = [];
   for (const src of sources) {
     try {
-      const hits = await searchFromSource(src, { keyword, count: perSourceCount, safesearch });
+      const hits = await searchFromSource(src, { keyword, count: perSourceCount, safesearch, size });
       results.push(...hits);
     } catch (err) {
       errors.push({ source: src, message: err && err.message ? err.message : String(err) });
@@ -123,7 +154,7 @@ export async function searchAndDownloadImagesHandler(args) {
   let hits = [];
   let searchErrors = [];
   try {
-    const result = await searchImagesFromSources(sources, { keyword, count, safesearch });
+    const result = await searchImagesFromSources(sources, { keyword, count, safesearch, size });
     hits = result.hits;
     searchErrors = result.errors || [];
   } catch (err) {
@@ -196,7 +227,8 @@ export async function searchAndDownloadImagesHandler(args) {
 export const tools = [
   {
     name: "search_and_download_images",
-    description: "按关键词从 Pixabay 和/或 Picjumbo 搜索图片并保存到本地目录。返回图片元数据与本地保存路径。",
+    description:
+      "按关键词从 Pixabay / Picjumbo / Pexels / Freerange / Noun Project（图标）/ Magnific 搜索免版权图片并保存到本地目录。返回图片元数据与本地保存路径。",
     inputSchema: searchAndDownloadImagesInputSchema,
   },
 ];
@@ -209,7 +241,8 @@ export const handlers = {
 export const toolRegistrations = [
   {
     name: "search_and_download_images",
-    description: "按关键词从 Pixabay 和/或 Picjumbo 搜索图片并保存到本地目录。返回图片元数据与本地保存路径。",
+    description:
+      "按关键词从 Pixabay / Picjumbo / Pexels / Freerange / Noun Project（图标）/ Magnific 搜索免版权图片并保存到本地目录。返回图片元数据与本地保存路径。",
     inputSchema: searchAndDownloadImagesShape,
     handler: searchAndDownloadImagesHandler,
   },

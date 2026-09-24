@@ -22,7 +22,8 @@ export function slugify(str) {
 export function buildFileName(hit) {
   const tags = (hit && hit.tags) || "";
   const firstTag = tags.split(",")[0].trim() || "image";
-  const url = (hit && hit.webformatURL) || "";
+  // 去掉 query/hash 后再推断扩展名，避免 URL 参数（如 ?dl=foo.jpg）干扰
+  const url = ((hit && hit.webformatURL) || "").split(/[?#]/)[0] || "";
   let ext = ".jpg";
   const dotIdx = url.lastIndexOf(".");
   if (dotIdx !== -1) {
