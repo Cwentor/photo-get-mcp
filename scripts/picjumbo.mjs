@@ -191,7 +191,7 @@ export async function searchImages({ keyword, count = 10, maxPages = 100 }) {
   return hits;
 }
 
-// CLI support: node src/picjumbo.js nature 3
+// CLI support: node scripts/picjumbo.mjs nature 3
 const __filename = fileURLToPath(import.meta.url);
 const mainFilename = process.argv[1];
 if (mainFilename && path.resolve(mainFilename) === path.resolve(__filename)) {

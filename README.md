@@ -1,29 +1,33 @@
 <div align="center">
 
-# 📸 photo-get-mcp
+# 📸 photo-get
 
-**基于 Model Context Protocol (MCP) 的多图库图片抓取服务器**
+**Agent Skill：按关键词搜索并下载免版权图片的零依赖 CLI**
 
-一句话指令，从 Pixabay / Picjumbo / Pexels / Freerange / Noun Project / Magnific 搜索免版权图片并直接下载到本地。
+一句话指令，从 Pixabay / Picjumbo / Pexels / Freerange / Noun Project / Magnific 搜索免版权图片并直接下载到本地。装进 agent 的 skills 目录后，说"帮我找几张 XX 的图"即可触发。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![MCP](https://img.shields.io/badge/Protocol-MCP-7c3aed)](https://modelcontextprotocol.io/)
-[![Tests](https://img.shields.io/badge/tests-55%20total-brightgreen)](#-测试)
+[![Deps](https://img.shields.io/badge/dependencies-0-brightgreen)](#-安装)
+[![Tests](https://img.shields.io/badge/tests-63%20total-brightgreen)](#-测试)
 
 </div>
 
 ---
 
+> **v2.0 重大变更**：本项目已从 MCP 服务器（photo-get-mcp）迁移为 **agent skill 包**。`server.js` 与 `@modelcontextprotocol/sdk`、`zod` 依赖已移除，核心逻辑不变，入口改为零依赖 CLI（`scripts/cli.mjs`），由 skill 指引 agent 通过 shell 调用。已注册旧版 MCP 的用户请改用 skill 安装方式。
+
 ## ✨ 功能特性
 
 - 🔍 **按关键词搜索**免版权图片，支持 6 个图库来源
 - 🔢 **批量下载** 1–200 张，多来源时自动分配数量并去重
+- 👀 **先预览后下载**（`--dry-run` 只搜索不落盘，输出命中列表）
 - 📐 **三种尺寸**可选：预览图 / 网络尺寸 / 原始大图
 - 🛡️ **安全搜索**过滤成人内容（Pixabay 来源）
 - 🔓 **免 Key 即用**：Pixabay（内置公开 Key）+ Freerange（无需 Key）
 - 📋 **完整元数据**返回：本地路径、URL、作者、标签、来源等
 - ⚠️ **单来源失败不影响整体**：错误记入 `search_warnings`，其余来源照常返回
+- 📦 **零依赖**：纯 Node.js ≥ 18 内置模块，无需 `npm install`
 
 ## 🖼️ 图片来源
 
@@ -41,21 +45,34 @@
 > ³ 在 [thenounproject.com/developers/apps](https://thenounproject.com/developers/apps/) 创建，设置 `NOUN_PROJECT_API_KEY` + `NOUN_PROJECT_API_SECRET`。
 > ⁴ 在 [Magnific 仪表盘](https://www.magnific.com/user/organization/api-keys) 生成，设置 `MAGNIFIC_API_KEY`（积分制）。
 >
-> **默认来源为 `['pixabay', 'freerangestock']`**——两个免配置来源开箱即用；其余来源配置 Key 后即可在 `source` 参数中选用。
+> **默认来源为 `pixabay,freerangestock`**——两个免配置来源开箱即用；其余来源配置 Key 后即可用 `--source` 选用。
 
 ## 📦 安装
 
-```bash
+**环境要求：** Node.js ≥ 18（原生 ESM + `fetch`），可访问互联网。**无需 `npm install`**。
+
+### 方式一：安装为 agent skill（推荐）
+
+```powershell
 git clone https://github.com/Cat-Drink/photo-get-mcp.git
 cd photo-get-mcp
-npm install
+.\install.ps1                        # 安装到 $HOME\.agents\skills\photo-get
+# 或指定目录：.\install.ps1 -Destination $HOME\.claude\skills\photo-get
 ```
 
-**环境要求：** Node.js ≥ 18（原生 ESM + `fetch`），可访问互联网。
+Linux / macOS：`./install.sh`
+
+安装后 agent 即按 SKILL.md 的指引通过 shell 调用 CLI。更新 skill 只需 `git pull` 后重跑安装脚本。
+
+### 方式二：直接作为 CLI 使用
+
+```bash
+node scripts/cli.mjs --keyword "sunset beach" --count 5 --save-dir D:/images/sunset
+```
 
 ## 🔑 配置 API Key（可选）
 
-各来源通过环境变量注入 Key，未配置的来源会返回明确的错误提示（记入 `search_warnings`），不影响其他来源：
+各来源通过环境变量注入 Key，未配置的来源会返回明确的错误提示（记入 `search_warnings` / `source_errors`），不影响其他来源：
 
 | 环境变量 | 来源 | 申请地址 |
 | --- |:---:| --- |
@@ -82,72 +99,41 @@ $env:MAGNIFIC_API_KEY = "your_key_here"
 
 ## 🚀 使用方式
 
-### 1️⃣ 作为 MCP 服务器（推荐）
+### CLI 参数
 
 ```bash
-npm start
+node scripts/cli.mjs --keyword <关键词> --save-dir <目录> [选项]
 ```
 
-服务器通过 stdin/stdout 与 MCP 客户端通信。
+| 参数 | 必填 | 默认值 | 说明 |
+| --- | :---: | --- | --- |
+| `--keyword <kw>` | ✅ | — | 搜索关键词，1–100 字符，如 `nature`、`cat` |
+| `--save-dir <dir>` | ✅* | — | 保存目录，不存在会自动创建；*`--dry-run` 模式下可省略 |
+| `--count <n>` | — | `10` | 下载数量 1–200，多来源时自动分配 |
+| `--size <s>` | — | `webformat` | `preview` / `webformat` / `large`（各来源映射见下表） |
+| `--source <list>` | — | `pixabay,freerangestock` | 逗号分隔来源列表 |
+| `--no-safesearch` | — | — | 关闭安全搜索（仅对 Pixabay 生效） |
+| `--dry-run` | — | — | 只搜索不下载，输出命中列表供预览 |
+| `--help` | — | — | 完整帮助 |
 
-### 2️⃣ 在 MCP 客户端中配置
+支持 `--flag value` 与 `--flag=value` 两种形式。
 
-**Claude Desktop**（macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`，Windows: `%APPDATA%\Claude\claude_desktop_config.json`）：
+### 输出协议（agent 友好）
 
-```json
-{
-  "mcpServers": {
-    "photo-get-mcp": {
-      "command": "node",
-      "args": [
-        "d:/Program/photo-get-mcp/src/server.js"
-      ]
-    }
-  }
-}
-```
-
-> 路径请替换为你的实际项目路径，Windows 建议使用正斜杠 `/`。同样适用于 Trae、Cursor 等支持 MCP 的客户端。
-
-重启客户端后，助手即可发现并调用 `search_and_download_images` 工具。
-
-### 3️⃣ 命令行测试
+- **成功**：stdout 输出结果 JSON，exit 0
+- **失败**：stdout 输出 `{ "error": ..., "issues"? / "source_errors"? }`，exit 1
+- **诊断**：人类可读进度走 stderr，**解析结果请只看 stdout 的 JSON 与退出码**
 
 ```bash
-node src/pixabay.js nature 5        # 搜索 Pixabay "nature"
-node src/freerangestock.js ocean 3  # 搜索 Freerange "ocean"（免 Key）
-node src/pexels.js nature 3        # 搜索 Pexels（需 PEXELS_API_KEY）
-node src/nounproject.js cat 5      # 搜索 Noun Project 图标（需 Key/Secret）
-node src/magnific.js nature 5      # 搜索 Magnific（需 MAGNIFIC_API_KEY）
-node src/picjumbo.js nature 3      # 搜索 Picjumbo（走 Web Archive，较慢）
-node src/downloader.js             # 单独测试下载器
+# 先预览命中（不落盘）
+node scripts/cli.mjs --keyword "sunset beach" --count 5 --dry-run
+
+# 确认后下载
+node scripts/cli.mjs --keyword "sunset beach" --count 5 --save-dir D:/images/sunset
+
+# 图标：nounproject 是图标库，large 尺寸为 SVG 矢量（需 Key）
+node scripts/cli.mjs --keyword "arrow" --count 10 --source nounproject --size large --save-dir D:/icons
 ```
-
-## 🛠️ MCP 工具
-
-### `search_and_download_images`
-
-按关键词搜索并下载图片到指定目录。
-
-| 参数 | 类型 | 必填 | 默认值 | 说明 |
-| --- | :---: | :---: | --- | --- |
-| `keyword` | `string` | ✅ | — | 搜索关键词，如 `nature`、`cat`、`landscape` |
-| `save_dir` | `string` | ✅ | — | 保存目录（绝对/相对路径），不存在会自动创建 |
-| `count` | `number` | — | `10` | 下载数量 1–200，多来源时自动分配 |
-| `size` | `string` | — | `webformat` | `preview` / `webformat` / `large`（各来源对应尺寸见下表） |
-| `safesearch` | `boolean` | — | `true` | 安全搜索（仅对 Pixabay 生效） |
-| `source` | `string \| string[]` | — | `["pixabay","freerangestock"]` | `"pexels"`、`"pixabay,pexels"` 或数组，全部来源见上表 |
-
-### 📐 各来源的尺寸对应关系
-
-| 来源 | `preview` | `webformat`（默认） | `large` |
-|:---:| --- | --- | --- |
-| pixabay | 150px | 640px | 原图 |
-| freerangestock | 缩略图 | sample 大图（约 1000px+） | sample（已是公开最大尺寸） |
-| pexels | tiny 280px | large 940px | original 原图 |
-| picjumbo | 小图 | 中图 | 原图 |
-| nounproject | 84px PNG | 200px PNG | SVG 矢量（无 SVG 时回退 200px PNG） |
-| magnific | 预览图（约 740px） | 预览图（约 740px） | 原图（走下载端点，逐个解析） |
 
 <details>
 <summary><b>📤 返回示例</b>（点击展开）</summary>
@@ -178,9 +164,11 @@ node src/downloader.js             # 单独测试下载器
 }
 ```
 
+`--dry-run` 模式返回 `{ "dry_run": true, "keyword", "sources", "total", "hits": [...], "search_warnings" }`，`hits` 内含各尺寸 URL、作者、宽高，可直接把链接给用户预览。
+
 </details>
 
-**💬 示例指令（告诉助手）：**
+**💬 示例指令（装好 skill 后直接对 agent 说）：**
 
 > 帮我从 pexels 搜索 5 张 `sunset beach` 主题的大图，保存到 `D:/images/sunset/`
 
@@ -188,30 +176,35 @@ node src/downloader.js             # 单独测试下载器
 
 > 帮我从 nounproject 下载 10 个 `arrow` 图标（SVG）到 `D:/icons/`
 
+### 📐 各来源的尺寸对应关系
+
+| 来源 | `preview` | `webformat`（默认） | `large` |
+|:---:| --- | --- | --- |
+| pixabay | 150px | 640px | 原图 |
+| freerangestock | 缩略图 | sample 大图（约 1000px+） | sample（已是公开最大尺寸） |
+| pexels | tiny 280px | large 940px | original 原图 |
+| picjumbo | 小图 | 中图 | 原图 |
+| nounproject | 84px PNG | 200px PNG | SVG 矢量（无 SVG 时回退 200px PNG） |
+| magnific | 预览图（约 740px） | 预览图（约 740px） | 原图（走下载端点，逐个解析） |
+
 ## 📁 项目结构
 
 ```
-photo-get-mcp/
-├── src/
-│   ├── server.js          # MCP 服务器入口：薄注册层
-│   ├── tools.js           # 工具 schema、handler、多来源搜索（单一事实来源）
-│   ├── pixabay.js         # Pixabay API 客户端（含 CLI 入口）
-│   ├── picjumbo.js        # Picjumbo 抓取客户端，走 Web Archive（含 CLI 入口）
-│   ├── pexels.js          # Pexels API 客户端（含 CLI 入口）
-│   ├── freerangestock.js  # Freerange 免 Key 搜索客户端（含 CLI 入口）
-│   ├── nounproject.js     # Noun Project 图标客户端，OAuth 1.0a 手写签名（含 CLI 入口）
-│   ├── magnific.js        # Magnific 图库搜索客户端（含 CLI 入口）
-│   └── downloader.js      # 图片下载 + 目录管理 + 并发控制（含 CLI 入口）
-├── tests/
-│   ├── tools.test.js            # Zod schema 校验测试
-│   ├── sources.test.js          # 来源归一化 + 各客户端映射 + OAuth 签名纯函数测试
-│   ├── picjumbo.test.js        # source 参数与 picjumbo/downloader 功能测试
-│   ├── freerangestock.test.js  # Freerange 免 Key 实测（真实网络）
-│   ├── live-sources.test.js    # 有 Key 来源的实测（无 Key 自动跳过）+ Pixabay 实测
-│   ├── server-handshake.test.js # MCP 握手测试
-│   └── e2e.test.js              # 端到端真实下载测试（默认双来源）
-├── tmp/                 # 测试和下载产物（git 忽略）
-├── package.json
+photo-get/
+├── SKILL.md               # Agent skill 入口（触发条件 + 使用指引）
+├── scripts/               # 零依赖 CLI（Node ≥ 18，无需 npm install）
+│   ├── cli.mjs            # CLI 入口：flags 解析 + JSON 输出协议 + 退出码
+│   ├── validate.mjs       # 参数校验与来源归一化（手写，零依赖）
+│   ├── search.mjs         # 多来源搜索编排 + 下载编排（含 dry-run）
+│   ├── downloader.mjs     # 图片下载 + 目录管理 + 并发控制
+│   ├── pixabay.mjs        # Pixabay API 客户端
+│   ├── picjumbo.mjs       # Picjumbo 抓取客户端，走 Web Archive
+│   ├── pexels.mjs         # Pexels API 客户端
+│   ├── freerangestock.mjs # Freerange 免 Key 搜索客户端
+│   ├── nounproject.mjs    # Noun Project 图标客户端，OAuth 1.0a 手写签名
+│   └── magnific.mjs       # Magnific 图库搜索客户端
+├── tests/                 # node --test 测试套件（默认离线，见下）
+├── install.ps1 / install.sh  # skill 安装脚本
 ├── LICENSE
 └── README.md
 ```
@@ -219,16 +212,25 @@ photo-get-mcp/
 ## 🧪 测试
 
 ```bash
-npm test          # 全量测试（含真实网络下载的 e2e）
-npm run test:fast # 跳过 e2e，速度快
+npm test          # 全量套件：默认全离线、确定性（网络用例自动跳过）
+npm run test:fast # 跳过 live-sources 套件
 ```
 
-覆盖：参数校验、多来源 schema、来源归一化、OAuth 1.0a 签名、各客户端 hit 映射、MCP 握手、工具列表、真实网络下载。
+真实网络测试由 `RUN_LIVE=1` 门控：
+
+```powershell
+$env:RUN_LIVE = "1"; npm test        # PowerShell
+```
+```bash
+RUN_LIVE=1 npm test                   # bash
+```
+
+覆盖：参数校验与默认值、来源归一化、CLI 参数解析/JSON 协议/退出码、OAuth 1.0a 签名、各客户端 hit 映射、下载文件名与扩展名推断、（RUN_LIVE 下）各来源真实搜索与端到端下载。
 
 ```
-ℹ tests 55
-ℹ pass 52
-ℹ skip 3   # 需 API Key 的来源实测，未配置 Key 时自动跳过
+ℹ tests 63
+ℹ pass 51
+ℹ skip 12  # 网络用例（默认门控跳过）
 ℹ fail 0
 ```
 
@@ -246,3 +248,4 @@ npm run test:fast # 跳过 e2e，速度快
 
 - **palette.fm**（AI 照片上色）等纯图像处理类 API 不提供按关键词搜索图片的能力，不属于图库搜索来源，故未集成。
 - Freerange 官方的 [Free Photo API](https://freerangestock.com/api) 需联系官方审批后发放 Key；本项目使用其网站自身调用的公开搜索接口，能力等价且无需 Key。
+- 旧版 MCP 接口的 `search_and_download_images` 工具与 v1.x tag（[v1.2.0](https://github.com/Cat-Drink/photo-get-mcp/tree/v1.2.0)）仍可访问，如需 MCP 形态请固定旧版本。

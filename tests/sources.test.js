@@ -1,61 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeSources, searchAndDownloadImagesSchema } from "../src/tools.js";
-import { mapPexelsPhoto } from "../src/pexels.js";
-import { mapFreerangePhoto } from "../src/freerangestock.js";
-import { mapMagnificResource } from "../src/magnific.js";
-import { mapNounProjectIcon, buildOAuth1Header, pctEncode } from "../src/nounproject.js";
-import { buildFileName } from "../src/downloader.js";
+import { mapPexelsPhoto } from "../scripts/pexels.mjs";
+import { mapFreerangePhoto } from "../scripts/freerangestock.mjs";
+import { mapMagnificResource } from "../scripts/magnific.mjs";
+import { mapNounProjectIcon, buildOAuth1Header, pctEncode } from "../scripts/nounproject.mjs";
 
-// ---- normalizeSources ----
-
-test("normalizeSources 默认返回 ['pixabay','freerangestock']", () => {
-  assert.deepEqual(normalizeSources(undefined), ["pixabay", "freerangestock"]);
-  assert.deepEqual(normalizeSources(null), ["pixabay", "freerangestock"]);
-});
-
-test("normalizeSources 接受单个新来源字符串", () => {
-  assert.deepEqual(normalizeSources("pexels"), ["pexels"]);
-  assert.deepEqual(normalizeSources("freerangestock"), ["freerangestock"]);
-  assert.deepEqual(normalizeSources("nounproject"), ["nounproject"]);
-  assert.deepEqual(normalizeSources("magnific"), ["magnific"]);
-  assert.deepEqual(normalizeSources("Picjumbo"), ["picjumbo"]);
-});
-
-test("normalizeSources 接受逗号分隔字符串并去重", () => {
-  assert.deepEqual(normalizeSources("pixabay,pexels"), ["pixabay", "pexels"]);
-  assert.deepEqual(normalizeSources("pexels, pexels ,pixabay"), ["pexels", "pixabay"]);
-});
-
-test("normalizeSources 接受数组并去重", () => {
-  assert.deepEqual(normalizeSources(["pexels", "magnific", "pexels"]), ["pexels", "magnific"]);
-});
-
-test("normalizeSources 对非法值回退到默认来源", () => {
-  assert.deepEqual(normalizeSources("not-a-source"), ["pixabay", "freerangestock"]);
-  assert.deepEqual(normalizeSources(["bad1", "bad2"]), ["pixabay", "freerangestock"]);
-});
-
-// ---- schema 兼容 ----
-
-test("schema 接受新来源 source='pexels' 与数组", () => {
-  const r1 = searchAndDownloadImagesSchema.safeParse({
-    keyword: "nature",
-    save_dir: "./tmp/test",
-    source: "pexels",
-  });
-  assert.equal(r1.success, true);
-
-  const r2 = searchAndDownloadImagesSchema.safeParse({
-    keyword: "nature",
-    save_dir: "./tmp/test",
-    source: ["nounproject", "magnific", "freerangestock"],
-  });
-  assert.equal(r2.success, true);
-  if (r2.success) {
-    assert.deepEqual(r2.data.source, ["nounproject", "magnific", "freerangestock"]);
-  }
-});
+// 纯 fixture 映射测试（离线）：验证各来源 API 响应 → 统一 hit 结构。
 
 // ---- Pexels 映射 ----
 
@@ -196,7 +146,7 @@ test("mapNounProjectIcon 无 icon_url 时 large 回退 200px PNG", () => {
   assert.equal(hit.largeImageURL, "https://static.thenounproject.com/png/148533-200.png");
 });
 
-// ---- OAuth 1.0a 签名 ----
+// ---- OAuth 1.0a 签名（Noun Project 用，离线） ----
 
 test("pctEncode 按 RFC 3986 编码", () => {
   assert.equal(pctEncode(" "), "%20");
@@ -252,26 +202,4 @@ test("buildOAuth1Header 确定性：相同输入产生相同签名，key 变化�
   assert.equal(h1, h2);
   const h3 = buildOAuth1Header({ ...args, consumerSecret: "other" });
   assert.notEqual(h1, h3);
-});
-
-// ---- downloader 扩展名识别（带 query 的 URL）----
-
-test("buildFileName 忽略 URL query string 推断扩展名", () => {
-  const hit = {
-    id: 42,
-    tags: "cat, animal",
-    webformatURL: "https://images.pexels.com/photos/42/pexels-photo-42.jpeg?h=350&w=500&dl=cat.jpg",
-  };
-  const name = buildFileName(hit);
-  assert.ok(name.endsWith(".jpeg"), `扩展名应为 .jpeg，实际: ${name}`);
-  assert.ok(name.startsWith("42-"), `文件名应以 id 开头: ${name}`);
-});
-
-test("buildFileName 对 SVG 图标 URL 推断 .svg 扩展名", () => {
-  const hit = {
-    id: "148533",
-    tags: "parking",
-    webformatURL: "https://static.thenounproject.com/svg_clean/148533.svg?Expires=123&Signature=abc",
-  };
-  assert.ok(buildFileName(hit).endsWith(".svg"));
 });

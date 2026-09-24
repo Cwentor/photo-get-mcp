@@ -1,20 +1,19 @@
 {
-  "name": "photo-get-mcp",
-  "version": "1.2.0",
-  "description": "MCP 图片抓取服务器：按关键词从 Pixabay / Picjumbo / Pexels / Freerange / Noun Project / Magnific 搜索并下载免版权图片",
-  "main": "src/server.js",
+  "name": "photo-get",
+  "version": "2.0.0",
+  "description": "按关键词从 Pixabay / Picjumbo / Pexels / Freerange / Noun Project / Magnific 搜索并下载免版权图片的 agent skill（零依赖 CLI）",
   "type": "module",
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "start": "node src/server.js",
-    "test": "node --test tests/tools.test.js tests/sources.test.js tests/picjumbo.test.js tests/freerangestock.test.js tests/live-sources.test.js tests/server-handshake.test.js tests/e2e.test.js",
-    "test:fast": "node --test tests/tools.test.js tests/sources.test.js tests/picjumbo.test.js tests/freerangestock.test.js tests/live-sources.test.js tests/server-handshake.test.js"
+    "test": "node --test tests/validate.test.js tests/downloader.test.js tests/sources.test.js tests/cli.test.js tests/live-sources.test.js",
+    "test:fast": "node --test tests/validate.test.js tests/downloader.test.js tests/sources.test.js tests/cli.test.js",
+    "test:live": "node --test tests/live-sources.test.js"
   },
   "keywords": [
-    "mcp",
-    "model-context-protocol",
+    "agent-skills",
+    "skill",
     "image-search",
     "pixabay",
     "picjumbo",
@@ -23,12 +22,9 @@
     "noun-project",
     "magnific",
     "stock-photos",
-    "image-downloader"
+    "image-downloader",
+    "royalty-free"
   ],
   "author": "chenwentao",
-  "license": "MIT",
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "zod": "^4.4.3"
-  }
+  "license": "MIT"
 }
