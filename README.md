@@ -54,7 +54,7 @@
 ### 方式一：安装为 agent skill（推荐）
 
 ```powershell
-git clone https://github.com/Cat-Drink/photo-get-mcp.git
+git clone https://github.com/Cwentor/photo-get-mcp.git
 cd photo-get-mcp
 .\install.ps1                        # 安装到 $HOME\.agents\skills\photo-get
 # 或指定目录：.\install.ps1 -Destination $HOME\.claude\skills\photo-get
@@ -248,4 +248,4 @@ RUN_LIVE=1 npm test                   # bash
 
 - **palette.fm**（AI 照片上色）等纯图像处理类 API 不提供按关键词搜索图片的能力，不属于图库搜索来源，故未集成。
 - Freerange 官方的 [Free Photo API](https://freerangestock.com/api) 需联系官方审批后发放 Key；本项目使用其网站自身调用的公开搜索接口，能力等价且无需 Key。
-- 旧版 MCP 接口的 `search_and_download_images` 工具与 v1.x tag（[v1.2.0](https://github.com/Cat-Drink/photo-get-mcp/tree/v1.2.0)）仍可访问，如需 MCP 形态请固定旧版本。
+- 旧版 MCP 接口的 `search_and_download_images` 工具与 v1.x tag（[v1.2.0](https://github.com/Cwentor/photo-get-mcp/tree/v1.2.0)）仍可访问，如需 MCP 形态请固定旧版本。
